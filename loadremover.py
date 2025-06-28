@@ -115,7 +115,11 @@ def main(argv):
     progress_bar.close()
     
     duration = total_written / fps
+    penalty_duration_york = duration + 38
+    penalty_duration_lanc = duration + 77
     print(f"Output duration: {format_timecode(duration)}")
+    print(f"Output duration with penalty starting Lancastrians: {format_timecode(penalty_duration_lanc)}")
+    print(f"Output duration with penalty starting Yorkists: {format_timecode(penalty_duration_york)}")
     
 if __name__ == "__main__":
     main(sys.argv[1:])
