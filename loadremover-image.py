@@ -1,4 +1,4 @@
-import sys, getopt, cv2, ffmpegcv
+import sys, cv2
 import numpy as np
 
 def main(argv):
@@ -8,9 +8,9 @@ def main(argv):
     
     infile = argv[0]
     outfile = argv[1]
-    threshold = .7
+    threshold = .9
     
-    template = cv2.imread("loading.png")
+    template = cv2.imread("loading_img.png")
     img_rgb = cv2.imread(infile)
     h, w = template.shape[:-1]
     
