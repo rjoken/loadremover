@@ -34,14 +34,6 @@ def format_timecode(seconds: float) -> str:
 def match_frame(frame, template, threshold):
     res = cv2.matchTemplate(frame, template, cv2.TM_CCOEFF_NORMED)
     return not (res >= threshold).any() # True = write frame 
-
-def process_batch(frames, template, threshold):
-    result = []
-    for idx, frame in frames:
-        keep = match_frame(frame, template, threshold)
-        if keep:
-            result.append((idx, frame))
-    return result
     
 def main(argv):
     parser = argparse.ArgumentParser(description="Remove loading frames from a segment of video and report runtime")
@@ -67,34 +59,39 @@ def main(argv):
     if not cap.isOpened():
         print(f"Could not open input video. '{args.infile}'")
         sys.exit(1)
-        
-    if start_ms is not None:
-        cap.set(cv2.CAP_PROP_POS_MSEC, start_ms)
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    start_frame = int((args.start * fps) if args.start is not None else 0)
+    end_frame = int((args.end * fps) if args.end is not None else total_frames)
+    start_frame = max(0, min(start_frame, total_frames))
+    end_frame = max(start_frame, min(end_frame, total_frames))
+    frames_to_process = end_frame - start_frame
+    
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
     out = cv2.VideoWriter(args.outfile, fourcc, fps, (width, height))
     
     total_written = 0
-    progress_bar = tqdm.tqdm(total=total_frames)
+    progress_bar = tqdm.tqdm(total=frames_to_process, unit='frame')
+    current_frame = start_frame 
+    done = False
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        while True:
-            batch, timestamps = [], []
-            for _ in range(args.batch):
+        while current_frame < end_frame and not done:
+            batch = []
+            to_read = min(args.batch, end_frame - current_frame)
+            for _ in range(to_read):
                 ret, frame = cap.read()
                 if not ret:
-                    break
-                ts = cap.get(cv2.CAP_PROP_POS_MSEC)
-                # if end time given, stop after it
-                if end_ms is not None and ts > end_ms:
+                    done = True
                     break
                 batch.append(frame)
-                timestamps.append(ts)
+                current_frame += 1
 
             if not batch:
                 break
@@ -108,7 +105,7 @@ def main(argv):
                 if keep:
                     out.write(frame)
                     total_written += 1
-                progress_bar.update(1)
+            progress_bar.update(len(batch))
 
     cap.release()
     out.release()
